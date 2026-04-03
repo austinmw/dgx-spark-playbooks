@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 cleanup() {
-  echo "Stopping gemma4-chat stack..."
+  echo "Stopping Open WebUI + vLLM stack..."
   docker compose down >/dev/null 2>&1 || true
   exit 0
 }
@@ -24,7 +24,7 @@ fi
 
 docker compose up -d
 
-echo "gemma4-chat is running. Keep this process alive for NVIDIA Sync."
+echo "Open WebUI + vLLM is running. Keep this process alive for NVIDIA Sync."
 while :; do
   sleep 86400
 done

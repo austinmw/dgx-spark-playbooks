@@ -1,10 +1,10 @@
-# Gemma 4 Chat Stack
+# Open WebUI + vLLM Stack
 
 Compose stack for:
 
 - `Open WebUI` as the browser UI
 - `vLLM` as the OpenAI-compatible backend
-- `Gemma 4` as the model family
+- `Gemma 4` as the default model family
 
 This is intended for a single DGX Spark and an MBP client connected through NVIDIA Sync.
 
@@ -20,6 +20,7 @@ This is intended for a single DGX Spark and an MBP client connected through NVID
 - Avoids mixing this setup with the repo's older `Open WebUI + Ollama` flow
 - Uses named volumes so `docker compose down -v` can fully wipe the stack
 - Binds host ports to `127.0.0.1` on the Spark so the UI/API are meant to be reached through SSH/NVIDIA Sync rather than your LAN
+- Keeps the existing internal Compose project name so renaming this directory does not force a restart of an already-running stack
 
 ## Setup
 
@@ -28,6 +29,22 @@ This is intended for a single DGX Spark and an MBP client connected through NVID
    - `HF_TOKEN`
    - `VLLM_API_KEY`
    - `WEBUI_SECRET_KEY`
+
+### Getting tokens
+
+- `HF_TOKEN`: create a Hugging Face access token at `https://huggingface.co/settings/tokens` and make sure the account has access to the gated Gemma model you want to use.
+- `VLLM_API_KEY`: generate this locally. It is just a shared secret between `Open WebUI` and your `vLLM` server.
+- `WEBUI_SECRET_KEY`: generate this locally. It is used by `Open WebUI` for app/session secrets.
+
+Example:
+
+```bash
+openssl rand -hex 24   # VLLM_API_KEY
+openssl rand -hex 32   # WEBUI_SECRET_KEY
+```
+
+You can paste those generated values directly into `.env`.
+
 3. Start the stack:
 
 ```bash
@@ -46,17 +63,19 @@ docker compose logs -f vllm
 
 Create a Custom Port entry in NVIDIA Sync:
 
-- Name: `Gemma 4 Chat`
+- Name: `Open WebUI + vLLM`
 - Port: `12010` by default, or whatever `OPEN_WEBUI_PORT` is set to in `.env`
 - Auto open in browser: enabled
 - Start Script: paste this:
 
 ```bash
 #!/usr/bin/env bash
-exec /path/to/dgx-spark-playbooks/nvidia/gemma4-chat/sync-start.sh
+exec /path/to/dgx-spark-playbooks/nvidia/open-webui-vllm/sync-start.sh
 ```
 
 Replace `/path/to/dgx-spark-playbooks` with the actual checkout path on your Spark.
+
+If you already created a Sync entry that points at the old `nvidia/gemma4-chat` path, update that script path. The running containers themselves do not need to be restarted just because the directory moved.
 
 ## Useful commands
 
@@ -106,6 +125,34 @@ Smaller / faster options:
 
 - `google/gemma-4-E4B-it`
 - `google/gemma-4-E2B-it`
+
+## Thinking mode
+
+Thinking mode is enabled by default in this stack at the `vLLM` layer.
+
+The `vllm` service in [compose.yaml](/home/austinmw/Developer/dgx-spark-playbooks/nvidia/open-webui-vllm/compose.yaml) starts with:
+
+- `--reasoning-parser gemma4`
+- `--default-chat-template-kwargs '{"enable_thinking": true}'`
+
+That means you do not need to put `<|think|>` into the Open WebUI system prompt just to turn Gemma 4 reasoning on.
+
+To turn thinking off:
+
+1. Edit [compose.yaml](/home/austinmw/Developer/dgx-spark-playbooks/nvidia/open-webui-vllm/compose.yaml)
+2. Remove these two arguments from the `vllm` service command:
+   - `--reasoning-parser gemma4`
+   - `--default-chat-template-kwargs '{"enable_thinking": true}'`
+3. Restart the stack:
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+To turn thinking back on, add those two arguments back and restart the stack again.
+
+After changing thinking mode, start a fresh chat in Open WebUI so the behavior is obvious and not mixed with older chat state.
 
 ## Notes
 

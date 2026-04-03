@@ -1,3 +1,5 @@
+# Keep the original Compose project name so an existing running stack
+# continues to be addressable after the directory is renamed.
 name: gemma4-chat
 
 services:
