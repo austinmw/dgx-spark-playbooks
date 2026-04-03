@@ -1,0 +1,50 @@
+name: gemma4-chat
+
+services:
+  vllm:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:gemma4-cu130}
+    gpus: all
+    ipc: host
+    environment:
+      HF_TOKEN: ${HF_TOKEN}
+      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN}
+    command:
+      - --model
+      - ${VLLM_MODEL:-nvidia/Gemma-4-31B-IT-NVFP4}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --api-key
+      - ${VLLM_API_KEY}
+      - --reasoning-parser
+      - gemma4
+      - --default-chat-template-kwargs
+      - '{"enable_thinking": true}'
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION:-0.90}
+    ports:
+      - 127.0.0.1:${VLLM_HOST_PORT:-8000}:8000
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+
+  open-webui:
+    image: ${OPEN_WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main}
+    depends_on:
+      - vllm
+    environment:
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+      ENABLE_OLLAMA_API: "false"
+      ENABLE_OPENAI_API: "true"
+      OPENAI_API_BASE_URL: http://vllm:8000/v1
+      OPENAI_API_KEY: ${VLLM_API_KEY}
+      TASK_MODEL_EXTERNAL: ${VLLM_MODEL:-nvidia/Gemma-4-31B-IT-NVFP4}
+      AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST: ${MODEL_LIST_TIMEOUT:-60}
+    ports:
+      - 127.0.0.1:${OPEN_WEBUI_PORT:-12010}:8080
+    volumes:
+      - open-webui-data:/app/backend/data
+
+volumes:
+  huggingface-cache:
+  open-webui-data:
